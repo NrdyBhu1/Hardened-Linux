@@ -1,0 +1,13 @@
+#!/usr/bin/bash
+# coding: utf-8
+
+check_encryption_status() {
+	if lsblk -f -o FSTYPE | grep -q 'crypto_LUKS'; then
+		echo "✅ Encryption"
+	else
+		echo "❌ Encryption"
+	fi
+}
+
+echo "Finding potential vulnerabilities"
+check_encryption_status
