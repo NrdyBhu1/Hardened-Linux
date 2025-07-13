@@ -3,7 +3,6 @@
 
 if [[ $EUID -ne 0 ]]; then
 	echo "Must run script in sudo mode"
-	set -x
 	exit 1
 fi
 
@@ -18,59 +17,74 @@ help_msg() {
 
 check_encryption_status() {
 	if lsblk -f -o FSTYPE | grep -q 'crypto_LUKS'; then
-		return 1
-	else
 		return 0
+	else
+		return 1
 	fi
 }
 
 new_disk() {
 	echo -ne "1.Format partition\n2.Format disk\n"
 	local part
-	read opt
-	if [ $opt -eq 1 ]; then
-		echo -n "Enter partition name: "
-		read part
+	read -p "[1/2]: " opt
+	if [[ $opt -eq 1 ]]; then
+		read -p "Enter full partition path (/dev/sXXX): " part
 		if [ ! -b "$part" ]; then
 			echo "Partition does not exist"
 			exit 1
 		fi
-	elif [ $opt -eq 2 ]; then
+	elif [[ $opt -eq 2 ]]; then
 		echo "Select a disk: "
 		lsblk -o NAME,SIZE,TYPE | grep disk
 		read disk
 		echo -ne "d\nn\np\n\n\n\nw\n" | sudo fdisk /dev/$disk  > /dev/null 2>&1
-		part="/dev/$disk"1
+		part="/dev/${disk}1"
 		echo "Created partition on $disk"
 	fi
-	sudo cryptsetup -v luksFormat "$part"
+
+	cryptsetup -v luksFormat "$part"
 	echo "Enter password for additional setup"
-	sudo cryptsetup -v luksOpen "$part" MyContainer
-	sudo mkfs.ext4 /dev/mapper/MyContainer
-	sudo cryptsetup -v luksClose MyContainer
+	cryptsetup -v luksOpen "$part" MyContainer
+	mkfs.ext4 /dev/mapper/MyContainer
+	cryptsetup -v luksClose MyContainer
 	echo "Setup done"
 }
 
-local mapper_name
-
 open_disk() {
-	echo -n "Enter container name: "
-	read mapper_name
+	read -p "Enter container name: " mapper_name
+
 	if !check_encryption_status; then
-		echo "No encrypted disk exists!"
+		echo "No encrypted volumes exist!"
 		exit 1
 	fi
+
 	part="$(lsblk -f -l -o NAME,FSTYPE | grep 'crypto_LUKS' | awk '{ print \"/dev/\"$1; }')"
-	sudo cryptsetup -v luksOpen "$part" "$mapper_name"
-	sudo mkdir "/mnt/$mapper_name"
-	sudo mount "/dev/mapper/$mapper_name" "/mnt/$mapper_name"
-	sudo chown "$USER":"$USER" "/mnt/$mapper_name"
+	if [[ -z $part ]]; then
+		echo "Could not detect any encrypted volume at $part"
+		exit 1
+	fi
+
+	cryptsetup -v luksOpen "$part" "$mapper_name"
+	mkdir -p "/mnt/$mapper_name"
+	mount "/dev/mapper/$mapper_name" "/mnt/$mapper_name"
+	chown "$USER":"$USER" "/mnt/$mapper_name"
 	echo "Mounted encrypted volume at: /mnt/$mapper_name"
+	echo "$mapper_name" > /tmp/active_mapper_name
 }
 
 close_disk() {
-	sudo umount "/mnt/$mapper_name"
-	sudo cryptsetup -v luksClose "$mapper_name"
+	if [[ ! -f /tmp/active_mapper_name ]]; then
+		echo "No active encrypted volumes mounted via this script"
+		exit 0
+	fi
+
+	mapper_name="$(< /tmp/active_mapper_name)"
+
+	umount "/mnt/$mapper_name"
+	cryptsetup -v luksClose "$mapper_name"
+	rm -rf "/mnt/$mapper_name"
+	rm /tmp/active_mapper_name
+	echo "Closed the encrypted volume"
 }
 
 case $1 in
@@ -80,9 +94,11 @@ case $1 in
 	;;
 	-open)
 		echo "Opening a new disk"
+		open_disk
 	;;
 	-close)
 		echo "Closing an open disk"
+		close_disk
 	;;
 	*)
 		help_msg
