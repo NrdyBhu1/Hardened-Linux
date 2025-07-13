@@ -63,7 +63,6 @@ Tested on:
 - Brute-force prevention with Fail2Ban
 - SSH port and authentication hardening
 - LUKS-based disk encryption lifecycle
-- Detection of insecure system states
 
 ---
 
