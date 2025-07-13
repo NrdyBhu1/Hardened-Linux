@@ -21,7 +21,7 @@ This project provides a practical implementation of Linux server hardening techn
 - SSH daemon hardening
 - Disk encryption helper (LUKS-based)
 - Simple vulnerability checks
-- Clean before/after config snapshots for documentation
+- Clean config snapshots for documentation
 
 ---
 
