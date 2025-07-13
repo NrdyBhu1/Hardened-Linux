@@ -37,23 +37,6 @@ $ sudo ./fail2ban_setup.sh
 
 ---
 
-## user_hardening.sh
-
-Applies user account security policies:
-
-- Enforces password aging (max 90 days, min 7 days, 14-day warning)
-- Detects users with empty passwords
-- Locks default system accounts (e.g., `ftp`, `mail`, etc.)
-- Disables root login via virtual terminals
-- Restricts sudo access to the `sudo` group
-
-**Usage:**
-```sh
-$ sudo ./user_hardening.sh
-```
-
----
-
 ## foxcheck
 
 Security auditing utility.
