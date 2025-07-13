@@ -1,0 +1,49 @@
+#!/usr/bin/bash
+# coding: utf-8
+
+check_encryption_status() {
+	if lsblk -f -o FSTYPE | grep -q 'crypto_LUKS'; then
+		echo "✅ Encryption"
+	else
+		echo "❌ Encryption"
+	fi
+}
+
+check_ufw() {
+    STATUS=$(sudo ufw status | grep -i "Status" | awk '{print $2}')
+    if [[ "$STATUS" == "active" ]]; then
+        echo "✅ UFW is active."
+    else
+        echo "❌ UFW is not active!"
+    fi
+}
+
+check_ssh() {
+	if ! systemctl list-units --type=service --all | grep -q 'ssh.service'; then
+		return 0
+	else
+		return 1
+	fi
+}
+
+check_fail2ban() {
+	if check_ssh ; then
+		return
+	fi
+
+    if systemctl is-active --quiet fail2ban; then
+        echo "✅ Fail2Ban is running."
+    else
+        echo "❌ Fail2Ban failed to start!"
+        systemctl status fail2ban
+        exit 1
+    fi
+
+    echo "🔒 Current jails:"
+    fail2ban-client status || echo "⚠️ Unable to fetch jail status."
+}
+
+echo "Finding potential vulnerabilities"
+check_encryption_status
+check_ufw
+check_fail2ban
